@@ -15,3 +15,4 @@ def _get_plot():
 
 def _add_legend(ax):
     ax.legend(loc="upper right", fontsize="12")
+    
