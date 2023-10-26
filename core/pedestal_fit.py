@@ -15,7 +15,8 @@ from dataclasses import dataclass
 from typing import Optional
 
 from core.sawtooth_extraction import ST_detector
-
+from core.ELM_extraction import ELM_phase
+from core.tools import _get_plot, _add_legend
 
 # Define a dataclass to hold the pedestal fit results
 @dataclass

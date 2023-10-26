@@ -1,3 +1,6 @@
+import numpy as np
+from cdb_extras import xarray_support as cdbxr  # access to COMPASS Database (CDB)
+
 def ELM_phase(nshot: int, t: np.ndarray, relative_to_nearest: bool =False):
     """
     Calculates the ELM phase and ELM delay of the timestamps in t, as well as the ELM period. 
