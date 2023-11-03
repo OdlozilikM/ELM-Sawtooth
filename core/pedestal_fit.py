@@ -16,7 +16,7 @@ from typing import Optional
 
 from core.sawtooth_extraction import ST_detector
 from core.ELM_extraction import ELM_phase
-from core.tools import _get_plot, _add_legend
+# from core.tools import _get_plot, _add_legend
 
 # Define a dataclass to hold the pedestal fit results
 @dataclass
@@ -66,7 +66,18 @@ class PedestalParams:
     pe_ELM_time: np.ndarray
     pe_ST_phase: np.ndarray
     pe_ST_time: np.ndarray
+        
+# Utility functions for creating a plot. Plots made with these functions will have the same style.
+def _get_plot():
+    fig, ax = plt.subplots(figsize=(6.5,5.5))
+    ax.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
+    ax.set_xlabel('ψ_norm')
+    ax.tick_params(axis='both', which='major', labelsize=12)
+    ax.tick_params(axis='both', which='minor', labelsize=10)
+    return fig, ax
 
+def _add_legend(ax):
+    ax.legend(loc="upper right", fontsize="12")
         
 
 def get_thomson_data(shot_nr, psi_n_lim:int):

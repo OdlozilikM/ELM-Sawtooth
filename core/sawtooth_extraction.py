@@ -12,6 +12,7 @@ from pathlib import Path
 from dataclasses import dataclass
 from typing import Optional, Union
 plt.rcParams.update({'font.size': 14})
+#from core.tools import _get_plot, _add_legend
 
 @dataclass
 class SawtoothCrashes:
@@ -27,6 +28,17 @@ class SawtoothCrashes:
     times: np.ndarray
     amplitudes: np.ndarray
         
+def _get_plot():
+    fig, ax = plt.subplots(figsize=(6.5,5.5))
+    ax.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
+    ax.set_xlabel('time [ms]')
+    ax.tick_params(axis='both', which='major', labelsize=12)
+    ax.tick_params(axis='both', which='minor', labelsize=10)
+    return fig, ax
+
+def _add_legend(ax):
+    ax.legend(loc="upper right", fontsize="12")
+            
       
     
 def _get_data(shot_nr: int, is_core: bool, plot: bool = False, f_high: float = 1.5, f_low: float = 0.05):
