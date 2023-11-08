@@ -14,6 +14,9 @@ from pathlib import Path # to easily work with different files
 from progressbar import ProgressBar
 plt.rcParams.update({'font.size': 14})
 
+from core.sawtooth_extraction import ST_detector, ST_time_and_phase
+
+
 # Define a dataclass to hold the pedestal fit results
 @dataclass
 class PedestalParams:
@@ -54,9 +57,30 @@ class PedestalParams:
     pe_ELM_time: np.ndarray
     pe_ST_phase: np.ndarray
     pe_ST_time: np.ndarray
+
+ 
+
+def combine_pedestalparams(pp_list):
+    def extract_subset(name):
+        return np.concatenate(tuple([getattr(pp, name).data for pp in pp_list]))
         
-        
-        
+    toplist = ['pe', 'ne', 'Te']
+    subset_list = ['height', 'height_err', 'grad', 'grad_err', 'width', 'width_err', 'time', 'ELM_phase', 'ST_phase', 'ST_time']
+    
+    d = {}
+    for topname in toplist:
+        subd = {}
+        for subname in subset_list:
+            name = f"{topname}_{subname}"
+            concat_arr = extract_subset(name)
+            subd[subname] = concat_arr
+        subd[topname] = subd
+    
+    subd['shot_nr'] = np.concatenate(tuple([np.full(pp.shot_number, len(pp.ne_height.data)) for pp in pp_list]))
+    return subd
+    
+    
+    
 def load_pedestal_data(load_path=str):
     pedestal_data_folder = Path(load_path)
     pedestal_data_list = []
@@ -95,12 +119,12 @@ def get_elm_length_and_time(shot_nr: int, times: np.ndarray):
 
 
 # Define function for getting the ST phase, ELM durations, ST amplitudes, and ST times of each ELM 
-def get_ELM_ST_phase_and_duration(shot_nr: int):
+def get_ELM_ST_phase_and_duration(shot_nr: int, load_path: str):
     shot = cdbxr.Shot(shot_nr)
     t_ELM_start = shot['t_ELM_start']
     ELM_duration = np.diff(t_ELM_start)
     
-    ELM_ST_phase, ELM_ST_time, ST_amplitudes = ST_time_and_phase(shot_nr, t_ELM_start[1:])
+    ELM_ST_phase, ELM_ST_time, ST_amplitudes = ST_time_and_phase(shot_nr, t_ELM_start[1:], load_path)
     return ELM_ST_phase, ELM_duration, ST_amplitudes, ELM_ST_time 
 
 
@@ -145,3 +169,45 @@ def scatter_pedestal_params(load_path: str,x: str = 'ELM_phase', s: str = 'pe', 
     if x == 'ELM_time':
         ax.set_xlim((0, np.percentile(all_x, 95)))
     ax.set_title("TS pedestal parameters")
+    
+    
+# def plot_ELM_to_sawtooth(ped_load_path: str,):
+#     pedestal_data_list=load_pedestal_data(load_path)
+#     ELM_ST_phase_tot=np.empty(0)
+#     ELM_ST_time_tot=np.empty(0)
+#     ELM_duration_tot=np.empty(0)
+#     for i, d in enumerate(pedestal_data_list):
+    
+# #     if d.shot_number in [18257, 18260, 18261, 18263, 18266, 18273, 18277]: #18274, 18275, 
+# #        continue
+    
+#     ELM_ST_phase, ELM_duration, ST_amplitudes, ELM_ST_time = get_ELM_ST_phase_and_duration(d.shot_number,saw_load_path)
+
+#     # Filters
+#     shot = cdbxr.Shot(d.shot_number)
+#     t_ELM_start = shot['t_ELM_start']
+    
+#     mask1 = np.logical_and(0. < ELM_duration, ELM_duration < 4)
+#     mask2 = np.logical_and(mask1, t_ELM_start[1:] < 1200)
+    
+#     ELM_ST_phase_tot = np.concatenate((ELM_ST_phase_tot, ELM_ST_phase[mask2]))
+#     ELM_ST_time_tot = np.concatenate((ELM_ST_time_tot, ELM_ST_time[mask2]))
+#     ELM_duration_tot = np.concatenate((ELM_duration_tot, ELM_duration[mask2]))
+
+#     # Start with a square Figure.
+#     fig = plt.figure(figsize=(6, 6))
+#     # Add a gridspec with two rows and two columns and a ratio of 1 to 4 between
+#     # the size of the marginal axes and the main axes in both directions.
+#     # Also adjust the subplot parameters for a square plot.
+#     gs = fig.add_gridspec(2, 2,  width_ratios=(4, 1), height_ratios=(1, 4),
+#                           left=0.1, right=0.9, bottom=0.1, top=0.9,
+#                           wspace=0.05, hspace=0.05)
+#     # Create the Axes.
+#     ax = fig.add_subplot(gs[1, 0])
+#     plt.xlabel('ELM period [ms]')
+#     plt.ylabel('ELM time relative to previous ST crash [ms]')
+#     ax_histx = fig.add_subplot(gs[0, 0], sharex=ax)
+#     ax_histy = fig.add_subplot(gs[1, 1], sharey=ax)
+#     # Draw the scatter plot and marginals.
+#     scatter_hist(ELM_duration_tot, ELM_ST_time_tot, ax, ax_histx, ax_histy)
+#     return fig

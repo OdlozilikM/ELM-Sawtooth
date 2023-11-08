@@ -262,3 +262,72 @@ def ST_detector(shot_nr: int, is_core: bool = True, with_plots: bool = False,
 
     # Save
     return _save_results(save_path, shot_nr, peak_x, peak_magnitudes)
+
+def ST_time_and_phase(nshot, t, load_path: str, relative_to_nearest=False):
+    shot = cdbxr.Shot(nshot)  # dict-like accessor to all signals measured in a given shot
+    
+    # Load positions of sawtooth crashes
+    sawtooth_data_folder = Path(load_path)
+    sawtooth_data_folder.mkdir(exist_ok=True)
+    filename = f"{nshot}_st.bin"
+    filepath = sawtooth_data_folder / Path(filename)
+    
+    if not filepath.exists():
+        ST_detector(nshot, save_path=load_path)
+        
+    with open(filepath, 'rb') as fp:
+        ST_data = pickle.load(fp)
+        ST_times = ST_data.times
+        ST_amplitudes = ST_data.amplitudes
+
+    # Allocate empty arrays to hold sawtooth phase and sawtooth amplitudes
+    ST_phases = np.full(fill_value=np.nan, shape=t.shape)
+    ret_t_delays = np.full(fill_value=np.nan, shape=t.shape)
+    ret_ST_amplitudes = np.full(fill_value=np.nan, shape=t.shape)
+    
+    if len(ST_times) == 0:
+        print(f"No STs in shot {nshot}. Cannot compute ST phases.")
+        return ST_phases, ST_amplitudes
+    
+    # Only calculate phases of times lying within first and last ST timestamp
+    mask = np.logical_and(ST_times[0] < t, ST_times[-1] > t)
+    t_masked = t[mask]
+    
+    # Get ST timestamps preceding and following each time
+    ST_ind_following_t = np.searchsorted(ST_times, t_masked)
+    ST_time_following_t = ST_times[ST_ind_following_t]
+    ST_time_preceding_t = ST_times[ST_ind_following_t-1]
+    
+    # Get ST amplitudes preceding each time
+    ST_amplitude_preceding_t = ST_amplitudes[ST_ind_following_t-1]
+    
+    # Calculate ST phase of each time
+    ST_duration = ST_time_following_t - ST_time_preceding_t
+    t_delay = t_masked - ST_time_preceding_t
+    if relative_to_nearest:
+        t_early = t_masked - ST_time_following_t
+        selection_mask = t_delay > np.abs(t_early)
+        t_delay[selection_mask] = t_early[selection_mask]
+        
+    phases = t_delay / ST_duration
+    
+    # Mask out ST phases that lasted more than 20ms
+    max_duration_mask = ST_duration > 20
+    phases[max_duration_mask] = np.nan
+    ST_amplitude_preceding_t[max_duration_mask] = np.nan
+    t_delay[max_duration_mask] = np.nan
+    
+    ST_phases[mask] = phases
+    ret_ST_amplitudes[mask] = ST_amplitude_preceding_t
+    ret_t_delays[mask] = t_delay
+    
+    # Sanity check
+    assert len(ST_phases) == len(t)
+    assert len(ret_t_delays) == len(t)
+    assert len(ret_ST_amplitudes) == len(t)
+    if not relative_to_nearest:
+        assert np.all(ST_phases[~np.isnan(ST_phases)] >= 0)
+        assert np.all(ret_t_delays[~np.isnan(ret_t_delays)] >= 0)
+    assert np.all(ret_ST_amplitudes[~np.isnan(ret_ST_amplitudes)] >= 0)
+    
+    return ST_phases, ret_t_delays, ret_ST_amplitudes 
