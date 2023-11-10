@@ -61,7 +61,7 @@ def _get_data(shot_nr: int, is_core: bool, plot: bool = False, f_high: float = 1
 
     spec = dsp.spectrogram(SXR_smoothed, nperseg=2**16, fs=fs)
     spec = spec.sel(frequency=slice(0, 2))
-
+    
     sum_spec = np.sum(np.abs(spec.data), axis=0)
     
     if plot:
@@ -81,7 +81,9 @@ def _get_data(shot_nr: int, is_core: bool, plot: bool = False, f_high: float = 1
         ax.set_ylabel('Soft X-rays [W]')
         _add_legend(ax)
         ax.set_title(f"Shot #{shot_nr} - {src}")
+        
     return SXR_smoothed, SXR_smoothed_diff, spec, sum_spec
+    
     
     
 def _find_peaks(SXR_smoothed_diff: np.ndarray, spec: np.ndarray, sum_spec: np.ndarray, is_core: bool, shot_nr:int, 
@@ -139,48 +141,6 @@ def _get_smallest_TS_distance(peak_x: np.ndarray):
     
     min_diff = np.min(np.vstack((forward_diff, backwards_diff)), axis=0)
     return min_diff
-
-
-def _get_ST_magnitudes(SXR_smoothed: np.ndarray, peaks_ind: np.ndarray, peak_x: np.ndarray, is_core: bool, shot_nr: int, 
-                       with_plots: bool = False):
-    """
-    Calculates the magnitude of each sawtooth crash. 
-    """
-    smallest_TS_distance = _get_smallest_TS_distance(peak_x)
-    crash_min=np.zeros(len(peaks_ind))
-    crash_max=np.zeros(len(peaks_ind))
-    SXR_idx=np.zeros(len(peaks_ind), dtype=int)
-    SXR_x=np.zeros(len(peaks_ind))
-    
-    if is_core:
-        scaler = 1
-    else:
-        scaler = -1
-    
-    for i, peak_i in enumerate(peaks_ind):
-        ind_window = 0.25 * 2000 * smallest_TS_distance[i]
-        subset = scaler*SXR_smoothed.data[int(peak_i-round(ind_window)):int(peak_i+round(ind_window))]
-        subset_argmax = np.argmax(subset)
-        
-        SXR_idx[i] = subset_argmax + int(peak_i-round(ind_window))
-        SXR_x[i] = SXR_smoothed.coords['time'][SXR_idx[i]]
-        crash_max[i] = subset[subset_argmax]
-        crash_min[i] = np.min(subset)
-    crash_amp = crash_max-crash_min
-        
-        
-    if with_plots:
-        ss = 10
-        t = SXR_smoothed.coords['time'][::ss]
-        fig, ax = _get_plot()
-        ax.plot(t, SXR_smoothed[::ss], label="Bandpassed SXR", zorder=1, c='C2')
-        ax.scatter(SXR_x, scaler*crash_max, c='Salmon', label="Detected sawtooths", zorder=1)
-        ax.vlines(SXR_x, scaler*crash_min, scaler*crash_max, label="Sawtooth amplitude")
-        _add_legend(ax)
-        ax.set_ylabel('Soft X-rays [W]')
-        ax.set_title(f"Shot #{shot_nr} - Sawtooth detection")
-    return crash_amp
-
 
 def _get_ST_magnitudes(SXR_smoothed: np.ndarray, peaks_ind: np.ndarray, peak_x: np.ndarray, is_core: bool, shot_nr: int, 
                        with_plots: bool = False):
