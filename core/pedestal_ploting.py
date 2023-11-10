@@ -170,44 +170,52 @@ def scatter_pedestal_params(load_path: str,x: str = 'ELM_phase', s: str = 'pe', 
         ax.set_xlim((0, np.percentile(all_x, 95)))
     ax.set_title("TS pedestal parameters")
     
-    
-# def plot_ELM_to_sawtooth(ped_load_path: str,):
-#     pedestal_data_list=load_pedestal_data(load_path)
-#     ELM_ST_phase_tot=np.empty(0)
-#     ELM_ST_time_tot=np.empty(0)
-#     ELM_duration_tot=np.empty(0)
-#     for i, d in enumerate(pedestal_data_list):
-    
-# #     if d.shot_number in [18257, 18260, 18261, 18263, 18266, 18273, 18277]: #18274, 18275, 
-# #        continue
-    
-#     ELM_ST_phase, ELM_duration, ST_amplitudes, ELM_ST_time = get_ELM_ST_phase_and_duration(d.shot_number,saw_load_path)
 
-#     # Filters
-#     shot = cdbxr.Shot(d.shot_number)
-#     t_ELM_start = shot['t_ELM_start']
-    
-#     mask1 = np.logical_and(0. < ELM_duration, ELM_duration < 4)
-#     mask2 = np.logical_and(mask1, t_ELM_start[1:] < 1200)
-    
-#     ELM_ST_phase_tot = np.concatenate((ELM_ST_phase_tot, ELM_ST_phase[mask2]))
-#     ELM_ST_time_tot = np.concatenate((ELM_ST_time_tot, ELM_ST_time[mask2]))
-#     ELM_duration_tot = np.concatenate((ELM_duration_tot, ELM_duration[mask2]))
 
-#     # Start with a square Figure.
-#     fig = plt.figure(figsize=(6, 6))
-#     # Add a gridspec with two rows and two columns and a ratio of 1 to 4 between
-#     # the size of the marginal axes and the main axes in both directions.
-#     # Also adjust the subplot parameters for a square plot.
-#     gs = fig.add_gridspec(2, 2,  width_ratios=(4, 1), height_ratios=(1, 4),
-#                           left=0.1, right=0.9, bottom=0.1, top=0.9,
-#                           wspace=0.05, hspace=0.05)
-#     # Create the Axes.
-#     ax = fig.add_subplot(gs[1, 0])
-#     plt.xlabel('ELM period [ms]')
-#     plt.ylabel('ELM time relative to previous ST crash [ms]')
-#     ax_histx = fig.add_subplot(gs[0, 0], sharex=ax)
-#     ax_histy = fig.add_subplot(gs[1, 1], sharey=ax)
-#     # Draw the scatter plot and marginals.
-#     scatter_hist(ELM_duration_tot, ELM_ST_time_tot, ax, ax_histx, ax_histy)
-#     return fig
+
+
+def scatter_pedestal_params_4plots(load_path: str, x: str = 'ELM_phase', s: str = 'pe', p: str = 'grad', ax=None):
+    """
+    Creates a scatterplot of one pedestal parameter (grad, height, width) of a Thomson Scatter variable (pe, Te, ne) as 
+    a function of either ELM or ST phase or time (ELM_phase, ELM_time, ST_phase, ST_time).
+    """
+    # Assume load_pedestal_data and get_elm_length_and_time functions are also in this library
+    # from .your_data_loading_module import load_pedestal_data, get_elm_length_and_time
+
+    pedestal_data_list = load_pedestal_data(load_path=load_path)
+    max_data = 0
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(10, 8))  # Adjust the figure size
+
+    all_x = np.empty(0)
+    for i, d in enumerate(pedestal_data_list):
+        time = getattr(d, s+'_time')
+        data = getattr(d, s+'_'+p)
+        data_err = getattr(d, s+'_'+p+'_err')
+
+        mask = time < 1200
+
+        if x == 'ELM_phase':
+            x_values = getattr(d, s+'_'+x)
+            x_values = x_values[0]
+        if x == 'ELM_time':
+            _, x_values = get_elm_length_and_time(d.shot_number, time)
+            valid_elm_lengths = np.logical_and(0 < x_values, x_values < 20)
+            mask = np.logical_and(valid_elm_lengths, mask)
+        else:
+            x_values = getattr(d, s+'_'+x)
+
+        # Plot
+        ax.errorbar(x_values[mask], data[mask], data_err[mask],
+                     c='red', ls='None', marker='d', label=f"{d.shot_number}", markersize=6, alpha=0.5)
+
+        if np.nanmax(data[mask]) > max_data:
+            max_data = np.nanmax(data[mask])
+        all_x = np.concatenate((all_x, x_values[mask]))
+
+    ax.set_ylabel(s+'_'+p)
+    ax.set_xlabel(x)
+    ax.set_ylim((0, max_data))
+    if x == 'ELM_time':
+        ax.set_xlim((0, np.percentile(all_x, 95)))
+    ax.set_title("TS pedestal parameters")

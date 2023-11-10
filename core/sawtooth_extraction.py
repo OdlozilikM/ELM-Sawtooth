@@ -220,8 +220,11 @@ def ST_detector(shot_nr: int, is_core: bool = True, with_plots: bool = False,
     # Get crash magnitudes
     peak_magnitudes = _get_ST_magnitudes(SXR_smoothed, peaks_ind, peak_x, is_core, shot_nr, with_plots)
 
+    
     # Save
     return _save_results(save_path, shot_nr, peak_x, peak_magnitudes)
+
+
 
 def ST_time_and_phase(nshot, t, load_path: str, relative_to_nearest=False):
     shot = cdbxr.Shot(nshot)  # dict-like accessor to all signals measured in a given shot
@@ -291,3 +294,134 @@ def ST_time_and_phase(nshot, t, load_path: str, relative_to_nearest=False):
     assert np.all(ret_ST_amplitudes[~np.isnan(ret_ST_amplitudes)] >= 0)
     
     return ST_phases, ret_t_delays, ret_ST_amplitudes 
+
+
+def ST_detector_plot(shot_nr: int, is_core: bool = True, 
+                     save_path: Optional[Union[Path, str]] = None, f_high: float = 1.5, f_low: float = 0.05,share_y: bool = True):
+    """
+    Locates sawteeth and their amplitudes in a COMPASS shot and plots the analysis steps in subplots.
+    
+    Arguments:
+        - shot_nr    : The COMPASS shot number
+        - is_core    : Whether to look for sawteeth in the core of the plasma (True) or the edge of the plasma (False)
+        - with_plots : Whether to create plots that show the behavior of the detection algorithm (good for debugging)
+        - save_path  : Location where to save the results. Turn off saving by passing save_path=None.
+        - f_high     : High-pass filter frequency for bandpass filtering
+        - f_low      : Low-pass filter frequency for bandpass filtering
+    """    
+    # Fetch data
+    shot = cdbxr.Shot(shot_nr)  # dict-like accessor to all signals measured in a given shot\
+    src = 'SXR_A_25' if is_core else 'SXR_A_32'
+    SXR = -1*shot[src]
+    SXR -= np.mean(SXR[:25])
+    fs = 1/np.nanmean(np.diff(SXR.coords['time'][:1000]))
+    
+    # Bandpass the SXR signal to get rid of high frequency noise and low frequency variation
+    SXR_smoothed = dsp.bandpass(SXR, f_high=f_high, f_low=f_low)
+    SXR_smoothed_diff = xr.zeros_like(SXR_smoothed)
+    SXR_smoothed_diff.values = np.gradient(SXR_smoothed.data) * fs
+
+    spec = dsp.spectrogram(SXR_smoothed, nperseg=2**16, fs=fs)
+    spec = spec.sel(frequency=slice(0, 2))
+    
+    sum_spec = np.sum(np.abs(spec.data), axis=0)
+        
+    # Locate crashes
+    peaks_ind, peak_x = _find_peaks(SXR_smoothed_diff, spec, sum_spec, is_core, shot_nr, with_plots=False)
+    
+    # Get crash magnitudes
+    peak_magnitudes = _get_ST_magnitudes(SXR_smoothed, peaks_ind, peak_x, is_core, shot_nr, with_plots=False)
+
+
+    # Create a single figure with subplots
+    fig, axes = plt.subplots(4, 1, figsize=(10, 12),sharex=True,sharey=share_y)
+    fig.suptitle(f'Shot #{shot_nr} - Sawtooth Detection')
+
+    # Plot 1: Raw SXR
+    axes[0].set_title('Raw SXR')
+
+    ss = 10
+    t = SXR.coords['time'][::ss]
+    norm = colors.LogNorm(*np.percentile(spec.data, (2, 98)))
+    # spec.plot(norm=norm) 
+    
+    axes[0].plot(t, SXR[::ss], label='Raw SXR')
+    axes[0].set_ylabel('Soft X-rays [W]')
+    _add_legend(axes[0])
+    axes[0].set_title(f"Raw data")
+
+    axes[1].plot(t, SXR_smoothed[::ss], label=f'Bandpassed SXR', c='C2')
+    axes[1].set_ylabel('Soft X-rays [W]')
+    _add_legend(axes[1])
+    axes[1].set_title(f"Bandpassed")
+
+    noise_floor = np.percentile(np.abs(SXR_smoothed_diff.data), 90)
+    # Find peak indeces
+    if is_core:
+        scaler = -1
+    else:
+        scaler = 1
+        
+    peaks_ind, _ = sps.signal.find_peaks(scaler*SXR_smoothed_diff.values, height=noise_floor, distance=3E3)
+    
+    # Mask peaks below 5% of the maximum energy content of the spectrogram
+    sum_spec_threshold = 0.05*np.max(sum_spec)
+    sum_spec_interpolated = np.interp(SXR_smoothed_diff.coords['time'], spec.coords['time'], sum_spec)
+    sum_spec_threshold_mask = sum_spec_interpolated[peaks_ind] > sum_spec_threshold
+    peaks_ind = peaks_ind[sum_spec_threshold_mask]
+    
+    # Get x values of peaks
+    peak_x = SXR_smoothed_diff.coords['time'].data[peaks_ind]
+    
+
+    ss = 10
+    t = SXR_smoothed_diff.coords['time'][::ss]
+    
+    axes[2].plot(t, SXR_smoothed_diff[::ss], label="Differentiated SXR", zorder=1)
+    axes[2].plot(t, np.full(len(t), scaler*noise_floor) , label="Estimated noise floor", zorder=1, c='red')
+    axes[2].scatter(peak_x, SXR_smoothed_diff[peaks_ind], c='Salmon', label="Detected peaks", zorder=1)
+    axes[2].fill_between(t, scaler*noise_floor, where=sum_spec_interpolated[::ss] > sum_spec_threshold, 
+                        facecolor='Salmon', alpha=.5, zorder=2, label="ST region")
+    _add_legend(axes[2])
+    axes[2].set_ylabel('Soft X-rays [W/s]')
+    axes[2].set_title(f'Peak detection')
+
+    """
+    Calculates the magnitude of each sawtooth crash. 
+    """
+    smallest_TS_distance = _get_smallest_TS_distance(peak_x)
+    crash_min=np.zeros(len(peaks_ind))
+    crash_max=np.zeros(len(peaks_ind))
+    SXR_idx=np.zeros(len(peaks_ind), dtype=int)
+    SXR_x=np.zeros(len(peaks_ind))
+    
+    if is_core:
+        scaler = 1
+    else:
+        scaler = -1
+    
+    for i, peak_i in enumerate(peaks_ind):
+        ind_window = 0.25 * 2000 * smallest_TS_distance[i]
+        subset = scaler*SXR_smoothed.data[int(peak_i-round(ind_window)):int(peak_i+round(ind_window))]
+        subset_argmax = np.argmax(subset)
+        
+        SXR_idx[i] = subset_argmax + int(peak_i-round(ind_window))
+        SXR_x[i] = SXR_smoothed.coords['time'][SXR_idx[i]]
+        crash_max[i] = subset[subset_argmax]
+        crash_min[i] = np.min(subset)
+    crash_amp = crash_max-crash_min
+        
+        
+
+
+    t = SXR_smoothed.coords['time'][::ss]
+    axes[3].plot(t, SXR_smoothed[::ss], label="Bandpassed SXR", zorder=1, c='C2')
+    axes[3].scatter(SXR_x, scaler*crash_max, c='Salmon', label="Detected sawtooths", zorder=1)
+    axes[3].vlines(SXR_x, scaler*crash_min, scaler*crash_max, label="Sawtooth amplitude")
+    _add_legend(axes[3])
+    axes[3].set_ylabel('Soft X-rays [W]')
+    axes[3].set_title(f"Shot #{shot_nr} - Sawtooth detection")
+
+
+    plt.tight_layout()
+    plt.show()
