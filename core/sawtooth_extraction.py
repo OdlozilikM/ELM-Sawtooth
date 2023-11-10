@@ -297,7 +297,7 @@ def ST_time_and_phase(nshot, t, load_path: str, relative_to_nearest=False):
 
 
 def ST_detector_plot(shot_nr: int, is_core: bool = True, 
-                     save_path: Optional[Union[Path, str]] = None, f_high: float = 1.5, f_low: float = 0.05,share_y: bool = True):
+                    f_high: float = 1.5, f_low: float = 0.05,share_y: bool = True):
     """
     Locates sawteeth and their amplitudes in a COMPASS shot and plots the analysis steps in subplots.
     
@@ -305,7 +305,6 @@ def ST_detector_plot(shot_nr: int, is_core: bool = True,
         - shot_nr    : The COMPASS shot number
         - is_core    : Whether to look for sawteeth in the core of the plasma (True) or the edge of the plasma (False)
         - with_plots : Whether to create plots that show the behavior of the detection algorithm (good for debugging)
-        - save_path  : Location where to save the results. Turn off saving by passing save_path=None.
         - f_high     : High-pass filter frequency for bandpass filtering
         - f_low      : Low-pass filter frequency for bandpass filtering
     """    
