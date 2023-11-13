@@ -218,4 +218,3 @@ def scatter_pedestal_params_4plots(load_path: str, x: str = 'ELM_phase', s: str 
     ax.set_ylim((0, max_data))
     if x == 'ELM_time':
         ax.set_xlim((0, np.percentile(all_x, 95)))
-    ax.set_title("TS pedestal parameters")
