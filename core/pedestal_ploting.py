@@ -124,11 +124,11 @@ def get_ELM_ST_phase_and_duration(shot_nr: int, load_path: str):
     t_ELM_start = shot['t_ELM_start']
     ELM_duration = np.diff(t_ELM_start)
     
-    ELM_ST_phase, ELM_ST_time, ST_amplitudes = ST_time_and_phase(shot_nr, t_ELM_start[1:], load_path)
+    ELM_ST_phase, ELM_ST_time, ST_amplitudes = ST_time_and_phase(shot_nr, t_ELM_start[1:], "./sawtooth_data")
     return ELM_ST_phase, ELM_duration, ST_amplitudes, ELM_ST_time 
 
 
-def scatter_pedestal_params(load_path: str,x: str = 'ELM_phase', s: str = 'pe', p: str = 'grad'):
+def scatter_pedestal_params(load_path: str,x: str, s: str, p: str):
     """
     Creates a scatterplot of one pedestal parameter (grad, height, width) of a Thomson Scatter variable (pe, Te, ne) as 
     a function of either ELM or ST phase or time (ELM_phase, ELM_time, ST_phase, ST_time).
@@ -174,7 +174,7 @@ def scatter_pedestal_params(load_path: str,x: str = 'ELM_phase', s: str = 'pe', 
 
 
 
-def scatter_pedestal_params_4plots(load_path: str, x: str = 'ELM_phase', s: str = 'pe', p: str = 'grad', ax=None):
+def scatter_pedestal_params_4plots(load_path: str, x: str, s: str, p: str, ax=None):
     """
     Creates a scatterplot of one pedestal parameter (grad, height, width) of a Thomson Scatter variable (pe, Te, ne) as 
     a function of either ELM or ST phase or time (ELM_phase, ELM_time, ST_phase, ST_time).

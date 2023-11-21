@@ -236,7 +236,7 @@ def ST_time_and_phase(nshot, t, load_path: str, relative_to_nearest=False):
     filepath = sawtooth_data_folder / Path(filename)
     
     if not filepath.exists():
-        ST_detector(nshot, save_path=load_path)
+        ST_detector(nshot)
         
     with open(filepath, 'rb') as fp:
         ST_data = pickle.load(fp)
