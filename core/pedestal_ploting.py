@@ -128,6 +128,17 @@ def get_ELM_ST_phase_and_duration(shot_nr: int, load_path: str):
     return ELM_ST_phase, ELM_duration, ST_amplitudes, ELM_ST_time 
 
 
+def get_triangularity_during_ELM(shot_nr: int):
+    shot = cdbxr.Shot(shot_nr)
+    t_ELM_start = shot['t_ELM_start']
+    t_ELM_end = shot['t_ELM_end']
+
+    
+    ELM_ST_phase, ELM_ST_time, ST_amplitudes = ST_time_and_phase(shot_nr, t_ELM_start[1:], "./sawtooth_data")
+    return ELM_ST_phase, ELM_duration, ST_amplitudes, ELM_ST_time 
+
+
+
 def scatter_pedestal_params(load_path: str,x: str, s: str, p: str):
     """
     Creates a scatterplot of one pedestal parameter (grad, height, width) of a Thomson Scatter variable (pe, Te, ne) as 
